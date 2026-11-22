@@ -374,10 +374,12 @@ function unifiedEdits(lines: string[], strict: boolean): Edit[] {
     const isDeletion = !isCreation && (newIsNull || sec.deletedFileMode);
 
     return (tree: Tree) => {
+      if (oldPath !== null && !safe(oldPath)) throw new Fail('unsafe', oldPath);
+      if (newPath !== null && !safe(newPath)) throw new Fail('unsafe', newPath);
+
       if (isCreation) {
-        const target = newPath ?? '/dev/null';
-        if (!safe(target)) throw new Fail('unsafe', target);
-        if (tree.get(target) !== null) throw new Fail('exists', target);
+        if (newPath === null) throw new Fail('unsafe', '/dev/null');
+        if (tree.get(newPath) !== null) throw new Fail('exists', newPath);
         const createdLines: string[] = [];
         let noEol = false;
         for (const h of sec.hunks) {
@@ -386,24 +388,20 @@ function unifiedEdits(lines: string[], strict: boolean): Edit[] {
             noEol = h.lastPlusNoEol;
           }
         }
-        tree.create(target, joinFile(createdLines, '\n', !noEol));
+        tree.create(newPath, joinFile(createdLines, '\n', !noEol));
         return;
       }
 
       if (isDeletion) {
-        const target = oldPath ?? '/dev/null';
-        if (!safe(target)) throw new Fail('unsafe', target);
-        if (tree.get(target) === null) throw new Fail('missing', target);
-        tree.remove(target);
+        if (oldPath === null) throw new Fail('unsafe', '/dev/null');
+        if (tree.get(oldPath) === null) throw new Fail('missing', oldPath);
+        tree.remove(oldPath);
         return;
       }
 
       const src = oldPath!;
       const dst = newPath!;
       const isMove = src !== dst;
-
-      if (!safe(src)) throw new Fail('unsafe', src);
-      if (isMove && !safe(dst)) throw new Fail('unsafe', dst);
 
       const before = tree.get(src);
       if (before === null) throw new Fail('missing', src);
